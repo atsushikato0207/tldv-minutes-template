@@ -1,0 +1,72 @@
+name: tldv minutes to Chatwork
+
+on:
+  # 2026-07-10: minutes_bot.pyのHTTP層をrequests化してActions定期実行に復帰。
+  # 2026-07-24: 複数メンバー対応+テンプレート配布用に汎用化。
+  schedule:
+    - cron: '0 22-23,0-14 * * *'  # JST 7:00〜23:00 の毎時0分 (UTC 22,23,0-14)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: minutes-bot
+  cancel-in-progress: false
+
+env:
+  # 失敗通知先ルーム(未設定なら通知ステップはスキップ)
+  NOTIFY_ROOM_ID: ${{ secrets.NOTIFY_ROOM_ID }}
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run minutes bot
+        env:
+          # 複数メンバー運用(中央リポジトリ)は MEMBERS_JSON、
+          # 各自デプロイ(テンプレート複製)は TLDV_API_KEY 以下のシングル設定を使う
+          MEMBERS_JSON: ${{ secrets.MEMBERS_JSON }}
+          TLDV_API_KEY: ${{ secrets.TLDV_API_KEY }}
+          CHATWORK_TOKEN: ${{ secrets.CHATWORK_TOKEN }}
+          CHATWORK_ROOM_ID: ${{ secrets.CHATWORK_ROOM_ID }}
+          MY_EMAILS: ${{ secrets.MY_EMAILS }}
+          MY_NAMES: ${{ secrets.MY_NAMES }}
+          MEMBER_LABEL: ${{ secrets.MEMBER_LABEL }}
+          MY_CHATWORK_ID: ${{ secrets.MY_CHATWORK_ID }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python minutes_bot.py
+
+      - name: Commit state
+        run: |
+          git config user.name "minutes-bot"
+          git config user.email "actions@github.com"
+          if ! git diff --quiet state.json; then
+            git add state.json
+            git commit -m "Update state [skip ci]"
+            git pull --rebase origin main
+            git push
+          fi
+
+      # 失敗を通知(黙って止まる事故の防止)。NOTIFY_ROOM_ID 未設定ならスキップ
+      - name: Notify failure to Chatwork
+        if: failure() && env.NOTIFY_ROOM_ID != ''
+        run: |
+          RESP=$(curl -s -X POST "https://api.chatwork.com/v2/rooms/${NOTIFY_ROOM_ID}/messages" \
+            -H "X-ChatWorkToken: ${{ secrets.CHATWORK_TOKEN }}" \
+            --data-urlencode "body=[info][title]⚠ tldv議事録ボット 失敗[/title]ログ:
+          ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}[/info]")
+          MID=$(echo "$RESP" | grep -oE '[0-9]+' | head -1)
+          if [ -n "$MID" ]; then
+            curl -s -X PUT "https://api.chatwork.com/v2/rooms/${NOTIFY_ROOM_ID}/messages/unread" \
+              -H "X-ChatWorkToken: ${{ secrets.CHATWORK_TOKEN }}" --data-urlencode "message_id=$MID" > /dev/null || true
+          fi
