@@ -247,19 +247,22 @@ SYSTEM_PROMPT = """あなたはYouTubeコンサルティング会社(弊社)の�
 読み手が短時間で「①何が決まったのか ②弊社が何を対応するのか ③貴社に何を対応いただくのか」を
 把握できる状態にします。
 
-出力は次の3セクションのみ(この順):
+出力は次の3セクションのみ(この順・見出しは■の直後にスペースを入れない):
 
-■ 決定事項
+■決定事項
 - 会議内で合意・確定した内容のみを記載する
-- 1項目につき1文でまとめる。背景や議論の経緯は記載しない
+- 1項目につき1文でまとめる。背景や議論の経緯は記載しない。条件・例外は同じ文に含めてよい
+  (例: 「原則として〜を想定する。〜の場合は別途〜で対応可能とする。」)
+- 「〜で合意した」「〜を確認した」を毎行繰り返さず、「〜とする」「〜方針とする」で言い切る
 - 未確定の内容は記載しない
 - 最大10項目程度に絞る
 
-■ 弊社対応
-- 弊社が対応するタスクのみ。1タスク1行で「・〇〇を対応する【期限：〇月〇日】」の形式
+■貴社対応事項
+- 貴社に対応いただくタスクのみ。1タスク1行で「・〇〇をご対応いただく」の形式
 
-■ 貴社対応
-- 貴社に対応いただくタスクのみ。1タスク1行で「・〇〇をご対応いただく【期限：〇月〇日】」の形式
+■弊社対応事項
+- 弊社が対応するタスクのみ。1タスク1行
+- 条件付きのタスクは条件を文頭に付ける(例: 「弊社にて発注いただける場合、契約書を作成し〜」)
 
 担当の分類ルール:
 - 担当者名は記載せず、必ず「弊社」または「貴社」のどちらかに分類する
@@ -270,9 +273,21 @@ SYSTEM_PROMPT = """あなたはYouTubeコンサルティング会社(弊社)の�
 - 担当を判断できない場合は、発言の依頼方向や実際の実行主体から分類する
 
 期限の記載ルール:
-- 明確な期限がある場合は、具体的な日付を記載する
-- 「次回まで」「撮影前」などの場合は、そのまま記載する
-- 期限が会議内で決まっていない場合は「未定」と記載する
+- 期限があるタスクは文末に「（～7/31）」の形式で付ける
+- 「今週中」「明日」「来週頭」などの相対表現は、冒頭に与える会議日時から具体日付に換算して
+  「（～7/31）」の形式で書く(換算できない場合のみそのまま)
+- 「次回まで」「撮影前」などイベント基準の期限は「（次回まで）」のようにそのまま記載する
+- 期限が会議内で決まっていない場合は何も付けない(「未定」と書かない)
+
+タスクの絞り込みルール(最重要・必ず守る):
+- 発注・契約が未確定の商談では、貴社対応事項・弊社対応事項は**各1〜2行まで**。
+  「次の一手」だけを書く(例: 貴社=発注検討、弊社=発注いただける場合の契約書準備)
+- 受注後に発生する作業(リサーチ・企画案・撮影準備・制作・導線設計・素材共有など)は
+  **タスクとして書いてはならない**。必要なら決定事項に「〜するフローとする」等の方針として1文で書く
+- 発注可否の回答・検討はタスク(貴社対応事項)にのみ書き、決定事項には書かない
+- 決定事項は会議の枠組みを決めた重要なものだけに絞る(3〜7項目)。料金・体制・場所・進め方の
+  方針が中心。細かい施策の列挙はしない
+- 発注済み案件の定例会議では、対応事項は実際に合意された宿題だけを書く(各セクション5行程度まで)
 
 整理ルール:
 - 「企画・制作方針」「アクションアイテム」「未確定事項」など、項目を細かく分けすぎない
@@ -286,14 +301,32 @@ SYSTEM_PROMPT = """あなたはYouTubeコンサルティング会社(弊社)の�
 - 簡潔で分かりやすいビジネス文にする
 
 出力形式:
-- Markdownは使わない(Chatworkでは装飾されないため)。見出しは「■ 」、箇条書きは「・」を使う
+- Markdownは使わない(Chatworkでは装飾されないため)。見出しは「■」、箇条書きは「・」を使う
 - 文字起こしから確認できた事実だけを書く。推測で数字・日付を補わない
-- 社内のみの会議(相手企業がいない場合)は貴社対応を「・なし」とし、社内タスクは弊社対応にまとめる
+- 社内のみの会議(相手企業がいない場合)は貴社対応事項を「・なし」とし、社内タスクは弊社対応事項にまとめる
 - 該当する内容がないセクションは「・なし」と書く
-- 挨拶や前置きは書かず、いきなり「■ 決定事項」から始める"""
+- 挨拶や前置きは書かず、いきなり「■決定事項」から始める
+
+出力例(商談段階の会議。この粒度・文体・形式に合わせる):
+■決定事項
+・撮影場所は、原則として弊社の新宿スタジオを想定する。仙台で撮影する場合は、別途交通費にて対応可能とする。
+・運用開始後、初期評価期間として6ヶ月間の効果検証を行う方針とする
+・撮影前に事前リサーチを実施したうえで、撮影時に使用する質問リストを作成・共有するフローとする
+・撮影は掛け合い方式とする
+
+■貴社対応事項
+・社内にてご発注有無を検討いただく（～7/31）
+
+■弊社対応事項
+・弊社にて発注いただける場合、契約書を作成し、8月から動き出せるよう企画を検討する"""
 
 
-def generate_minutes(meeting_name, transcript):
+def generate_minutes(meeting_name, transcript, happened_jst=None):
+    weekdays = ["月", "火", "水", "木", "金", "土", "日"]
+    when = ""
+    if happened_jst is not None:
+        when = "会議日時: %s(%s)\n" % (happened_jst.strftime("%Y/%m/%d %H:%M"),
+                                       weekdays[happened_jst.weekday()])
     body = http_json(
         "https://api.openai.com/v1/chat/completions",
         {"Authorization": "Bearer " + OPENAI_API_KEY},
@@ -302,7 +335,8 @@ def generate_minutes(meeting_name, transcript):
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user",
-                 "content": "会議名: %s\n\n文字起こし:\n%s" % (meeting_name, transcript[:80000])},
+                 "content": "会議名: %s\n%s\n文字起こし:\n%s"
+                            % (meeting_name, when, transcript[:80000])},
             ],
         },
     )
@@ -375,6 +409,23 @@ def process_member(member, state, minutes_cache, now, dry_run):
             pending += 1
             continue
 
+        # 同一会議の二重録画(同名・近接時刻)は最初の1本だけ投稿する
+        # (2026-07-28 インディゴッドMTGで録画が2本あり議事録が2通届いた事象への対策)
+        dup = any(
+            v.get("status") == "posted"
+            and (v.get("name") or "").strip() == name.strip()
+            and v.get("happened")
+            and abs((datetime.fromisoformat(v["happened"]) - happened).total_seconds()) < 3600
+            for k, v in processed.items() if k.startswith(label + ":"))
+        if dup:
+            print("[%s] スキップ(同一会議の重複録画): %s" % (label, name))
+            processed[key] = {"name": name, "status": "duplicate_skip",
+                              "happened": happened.isoformat(), "at": now.isoformat()}
+            if not dry_run:
+                save_state(state)
+            skipped += 1
+            continue
+
         # 1件の失敗(tldv 403等)で残りの会議やstate保存が道連れにならないよう会議単位で隔離
         try:
             time.sleep(3)  # tldv手前のCloudflareレート制限(403)対策: 連発を避ける
@@ -384,7 +435,7 @@ def process_member(member, state, minutes_cache, now, dry_run):
             if not attended:
                 print("[%s] スキップ(不参加): %s" % (label, name))
                 processed[key] = {"name": name, "status": "not_attended",
-                                  "at": now.isoformat()}
+                                  "happened": happened.isoformat(), "at": now.isoformat()}
                 if not dry_run:
                     save_state(state)
                 skipped += 1
@@ -396,7 +447,8 @@ def process_member(member, state, minutes_cache, now, dry_run):
 
             print("[%s] 議事録生成中: %s (%d文字)" % (label, name, len(transcript)))
             if mid not in minutes_cache:
-                minutes_cache[mid] = generate_minutes(name, transcript)
+                minutes_cache[mid] = generate_minutes(name, transcript,
+                                                      happened.astimezone(JST))
             message = build_message(meeting, minutes_cache[mid], happened.astimezone(JST))
         except Exception as e:
             failures[key] = failures.get(key, 0) + 1
@@ -404,6 +456,7 @@ def process_member(member, state, minutes_cache, now, dry_run):
                 # 恒常エラー(権限403等)は諦めて記録し、届け先に1回だけ知らせる
                 print("[%s] 断念(%d回失敗): %s — %s" % (label, failures[key], name, e))
                 processed[key] = {"name": name, "status": "error_gave_up",
+                                  "happened": happened.isoformat(),
                                   "at": now.isoformat(), "error": str(e)[:200]}
                 failures.pop(key, None)
                 if not dry_run:
@@ -436,7 +489,8 @@ def process_member(member, state, minutes_cache, now, dry_run):
             print("[%s] Chatwork投稿完了: %s → room %s (message_id=%s)"
                   % (label, name, room, result.get("message_id")))
             # 直後にクラッシュしても二重投稿しないよう、1件ごとに即保存する
-            processed[key] = {"name": name, "status": "posted", "at": now.isoformat()}
+            processed[key] = {"name": name, "status": "posted",
+                              "happened": happened.isoformat(), "at": now.isoformat()}
             failures.pop(key, None)
             save_state(state)
         posted += 1
