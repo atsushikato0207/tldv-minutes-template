@@ -21,7 +21,7 @@ GitHub Actions で1時間ごとに実行される想定(ローカル実行も可
 MEMBERS_JSON が無い場合は従来のシングル運用にフォールバック:
   TLDV_API_KEY / CHATWORK_TOKEN / CHATWORK_ROOM_ID(既定442074010) / MY_EMAILS / MY_NAMES
 
-共通: OPENAI_API_KEY(必須) / OPENAI_MODEL(既定 gpt-5-mini)
+共通: OPENAI_API_KEY(必須) / OPENAI_MODEL(既定 gpt-6.1-terra)
 
 使い方:
   python minutes_bot.py            # 通常実行(投稿+state更新)
@@ -70,7 +70,7 @@ def _from_json_file(path, key):
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY") or ""
 if not OPENAI_API_KEY:
     sys.exit("認証情報がありません: OPENAI_API_KEY")
-OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-5-mini")
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-6.1-terra")
 
 
 def load_members():
